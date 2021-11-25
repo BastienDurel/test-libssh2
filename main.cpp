@@ -83,16 +83,17 @@ const char* ed_pkey_pp =
   "-----END OPENSSH PRIVATE KEY-----\n";
 
 BOOST_AUTO_TEST_CASE( ssh ) {
-  const std::string username{ "test" };
   remote.check_host = false;
-  int rc = test_pubkey(username, pubkey, pkey, nullptr);
-  BOOST_REQUIRE_EQUAL(rc, LIBSSH2_ERROR_AUTHENTICATION_FAILED);
-  rc = test_pubkey(username, pubkey, pkey_pp, keypass);
-  BOOST_REQUIRE_EQUAL(rc, LIBSSH2_ERROR_AUTHENTICATION_FAILED);
-  rc = test_pubkey(username, ed_pubkey, ed_pkey, nullptr);
-  BOOST_REQUIRE_EQUAL(rc, LIBSSH2_ERROR_AUTHENTICATION_FAILED);
-  rc = test_pubkey(username, ed_pubkey, ed_pkey_pp, keypass);
-  BOOST_REQUIRE_EQUAL(rc, LIBSSH2_ERROR_AUTHENTICATION_FAILED);
-  rc = test_pubkey(username, ed_pubkey, pkey, nullptr);
-  BOOST_REQUIRE_EQUAL(rc, LIBSSH2_ERROR_AUTHENTICATION_FAILED);
+  BOOST_WARN_MESSAGE(remote.host != "localhost", "Testing with localhost!");
+  int rc = test_pubkey(pubkey, pkey, nullptr);
+  BOOST_CHECK_EQUAL(rc, 0);
+  rc = test_pubkey(pubkey, pkey_pp, keypass);
+  BOOST_CHECK_EQUAL(rc, 0);
+  rc = test_pubkey(ed_pubkey, ed_pkey, nullptr);
+  BOOST_CHECK_EQUAL(rc, 0);
+  rc = test_pubkey(ed_pubkey, ed_pkey_pp, keypass);
+  BOOST_CHECK_EQUAL(rc, 0);
+  // Incorrect pubkey: show fail with LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED
+  rc = test_pubkey(ed_pubkey, pkey, nullptr);
+  BOOST_CHECK_EQUAL(rc, LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED);
 }

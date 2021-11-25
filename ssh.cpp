@@ -10,11 +10,12 @@
 
 #include <boost/log/trivial.hpp>
 
-remote_t remote{ getenv("TEST_HOST"), getenv("TEST_PORT") };
+remote_t remote(getenv("TEST_HOST"), getenv("TEST_PORT"), getenv("TEST_USER"));
 
-remote_t::remote_t(const char* h, const char* p) {
+remote_t::remote_t(const char* h, const char* p, const char* u) {
   host = h ? h : "localhost";
   port = p ? p : "22";
+  username = u ? u : "test";
 }
 
 static std::string type2string(int type) {
@@ -218,20 +219,19 @@ static int auth_pukey_mem(LIBSSH2_SESSION *session, const std::string& username,
   return rc;
 }
 
-int test_pubkey(const std::string& username, const std::string& pubkeydata,
-                const std::string& keydata, const char* keypass) {
+int test_pubkey(const std::string& pubkeydata, const std::string& keydata,
+                const char* keypass) {
   LIBSSH2_SESSION *session = make_session();
   libssh2_trace(session,
                 LIBSSH2_TRACE_KEX | LIBSSH2_TRACE_PUBLICKEY |
                 LIBSSH2_TRACE_ERROR);
-  return _test_pubkey(session, username, pubkeydata, keydata, keypass);
+  return _test_pubkey(session, pubkeydata, keydata, keypass);
 }
 
 using namespace boost::filesystem;
 
-int _test_pubkey(LIBSSH2_SESSION *session, const std::string& username,
-                 const std::string& pubkeydata, const std::string& keydata,
-                 const char* keypass) {
+int _test_pubkey(LIBSSH2_SESSION *session, const std::string& pubkeydata,
+                 const std::string& keydata, const char* keypass) {
   using tcp = boost::asio::ip::tcp;
   boost::asio::io_context io_context;
   tcp::resolver r(io_context);
@@ -302,6 +302,7 @@ int _test_pubkey(LIBSSH2_SESSION *session, const std::string& username,
         BOOST_LOG_TRIVIAL(debug) << "Host key matches with known_hosts";
     }
   }
-    
-  return auth_pukey_mem(session, username, pubkeydata, keydata, keypass);
+
+  // Test pubkey function
+  return auth_pukey_mem(session, remote.username, pubkeydata, keydata, keypass);
 }
