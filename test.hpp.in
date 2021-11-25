@@ -1,0 +1,17 @@
+#include <utility>
+#include <string>
+#include <vector>
+
+#cmakedefine HAVE_UNISTD @HAVE_UNISTD@
+#cmakedefine HAVE_MKSTEMP @HAVE_MKSTEMP@
+
+#ifndef LIBSSH2_H
+typedef void LIBSSH2_SESSION;
+#endif
+
+#if !defined THROW
+#define THROW(x) do { std::string __err_x(x);                           \
+    BOOST_LOG_TRIVIAL(debug) << "Throwing error {" << __err_x << "} "   \
+                             << "at " << __FILE__ << ':' << __LINE__;   \
+    throw std::runtime_error(__err_x); } while (false)
+#endif// THROW
