@@ -38,4 +38,7 @@ static inline const std::string known_retvals(int rc) {
   return std::to_string(rc);
 }
 
+// print human-readable rc in debug log
+void debug_rc(int rc);
+
 #endif// TEST_SSH_HPP_INCLUDED

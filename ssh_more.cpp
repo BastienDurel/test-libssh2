@@ -12,6 +12,34 @@
 
 using namespace boost::filesystem;
 
+static bool sshInit = false;
+static std::mutex sMutex;
+LIBSSH2_SESSION *make_session(void) {
+  if (!sshInit) {
+    std::lock_guard _lock(sMutex);
+    if (!sshInit) {
+      int rc;
+#if defined _WIN32 || defined _WIN64
+      WSADATA wsadata;
+
+      rc = WSAStartup(MAKEWORD(2, 0), &wsadata);
+      if (rc != 0)
+        THROW("WSAStartup failed with error: " + std::to_string(rc));
+#endif
+      rc = libssh2_init(0);
+      if (rc != 0)
+        THROW("libssh2 initialization failed: " + std::to_string(rc));
+      sshInit = true;
+    }
+  }
+  LIBSSH2_SESSION* session = libssh2_session_init();
+  if (!session)
+    THROW("session initialization failed");
+  // tell libssh2 we want it all done non-blocking
+  libssh2_session_set_blocking(session, 0);
+  return session;
+}
+
 std::string ssh2_err(LIBSSH2_SESSION* session) {
   char* msg;
   int len;
@@ -105,5 +133,26 @@ void _check_kh_fp(LIBSSH2_SESSION *session) {
       case LIBSSH2_KNOWNHOST_CHECK_MATCH:
         BOOST_LOG_TRIVIAL(debug) << "Host key matches with known_hosts";
     }
+  }
+}
+
+void debug_rc(int rc) {
+  switch (rc) {
+    case LIBSSH2_ERROR_AUTHENTICATION_FAILED:
+      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_AUTHENTICATION_FAILED";
+      break;
+    case LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED:
+      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED";
+      break;
+    case LIBSSH2_ERROR_ALLOC:
+      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_ALLOC";
+      break;
+    case LIBSSH2_ERROR_SOCKET_SEND:
+      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_SOCKET_SEND";
+        break;
+    case LIBSSH2_ERROR_SOCKET_TIMEOUT:
+      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_SOCKET_TIMEOUT";
+      break;
+    default: break;
   }
 }

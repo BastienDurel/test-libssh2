@@ -35,34 +35,6 @@ static void write(int fd, const std::string& data) {
   ::close(fd);
 }
 
-static bool sshInit = false;
-static std::mutex sMutex;
-LIBSSH2_SESSION *make_session(void) {
-  if (!sshInit) {
-    std::lock_guard _lock(sMutex);
-    if (!sshInit) {
-      int rc;
-#if defined _WIN32 || defined _WIN64
-      WSADATA wsadata;
-
-      rc = WSAStartup(MAKEWORD(2, 0), &wsadata);
-      if (rc != 0)
-        THROW("WSAStartup failed with error: " + std::to_string(rc));
-#endif
-      rc = libssh2_init(0);
-      if (rc != 0)
-        THROW("libssh2 initialization failed: " + std::to_string(rc));
-      sshInit = true;
-    }
-  }
-  LIBSSH2_SESSION* session = libssh2_session_init();
-  if (!session)
-    THROW("session initialization failed");
-  // tell libssh2 we want it all done non-blocking
-  libssh2_session_set_blocking(session, 0);
-  return session;
-}
-
 // If libssh2 is not built against openssl,
 // libssh2_userauth_publickey_frommemory fails, therefore we have to write
 // key material in tempfiles and use libssh2_userauth_publickey_fromfile
@@ -100,28 +72,7 @@ static int _auth_pukey_mem2file(LIBSSH2_SESSION *session,
                                              keypass
       );
   } while (rc == LIBSSH2_ERROR_EAGAIN);
-  switch (rc) {
-    case LIBSSH2_ERROR_AUTHENTICATION_FAILED:
-      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_AUTHENTICATION_FAILED";
-      break;
-    case LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED:
-      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED";
-      break;
-    case LIBSSH2_ERROR_ALLOC:
-      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_ALLOC";
-      break;
-    case LIBSSH2_ERROR_SOCKET_SEND:
-      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_SOCKET_SEND";
-      break;
-    case LIBSSH2_ERROR_SOCKET_TIMEOUT:
-      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_SOCKET_TIMEOUT";
-      break;
-    default: break;
-  }
-  //exec{ "cat", pubkey.fn() }.run();
-  //exec{ "cat", privkey.fn() }.run();
-  //std::cout << keypass << std::endl;
-  //int k; (std::cerr << "Enter key: ").flush(); std::cin >> k;
+  debug_rc(rc);
   return rc;
 }
 
@@ -153,24 +104,7 @@ static int auth_pukey_mem(LIBSSH2_SESSION *session, const std::string& username,
                                                keydata.size(),
                                                keypass);
   } while (rc == LIBSSH2_ERROR_EAGAIN);
-  switch (rc) {
-    case LIBSSH2_ERROR_AUTHENTICATION_FAILED:
-      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_AUTHENTICATION_FAILED";
-      break;
-    case LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED:
-      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED";
-      break;
-    case LIBSSH2_ERROR_ALLOC:
-      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_ALLOC";
-      break;
-    case LIBSSH2_ERROR_SOCKET_SEND:
-      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_SOCKET_SEND";
-        break;
-    case LIBSSH2_ERROR_SOCKET_TIMEOUT:
-      BOOST_LOG_TRIVIAL(debug) << "LIBSSH2_ERROR_SOCKET_TIMEOUT";
-      break;
-    default: break;
-  }
+  debug_rc(rc);
 #if !defined HAVE_LIBSSH2_CRYPTOENGINE_API
   // We don't know if openssl is built in or not. If not, we must
   // write keys into temporary files
