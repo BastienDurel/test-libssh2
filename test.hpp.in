@@ -4,6 +4,7 @@
 
 #cmakedefine HAVE_UNISTD @HAVE_UNISTD@
 #cmakedefine HAVE_MKSTEMP @HAVE_MKSTEMP@
+#cmakedefine TEST_WITH_KH_FP @TEST_WITH_KH_FP@
 
 #ifndef LIBSSH2_H
 typedef void LIBSSH2_SESSION;
