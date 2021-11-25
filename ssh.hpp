@@ -2,7 +2,6 @@
 #define TEST_SSH_HPP_INCLUDED
 
 #include <libssh2.h>
-#include <boost/filesystem.hpp>
 
 LIBSSH2_SESSION *make_session(void);
 
@@ -20,6 +19,21 @@ struct remote_t {
 };
 extern remote_t remote;
 
-boost::filesystem::path home();
+static inline const std::string known_retvals(int rc) {
+  switch (rc) {
+    case LIBSSH2_ERROR_AUTHENTICATION_FAILED:
+      return "LIBSSH2_ERROR_AUTHENTICATION_FAILED";
+    case LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED:
+      return "LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED";
+    case LIBSSH2_ERROR_ALLOC:
+      return "LIBSSH2_ERROR_ALLOC";
+    case LIBSSH2_ERROR_SOCKET_SEND:
+      return "LIBSSH2_ERROR_SOCKET_SEND";
+    case LIBSSH2_ERROR_SOCKET_TIMEOUT:
+      return "LIBSSH2_ERROR_SOCKET_TIMEOUT";
+    default: break;
+  }
+  return std::to_string(rc);
+}
 
 #endif// TEST_SSH_HPP_INCLUDED

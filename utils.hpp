@@ -76,4 +76,6 @@ struct auto_close_sock {
   ~auto_close_sock() { s.close(); }
 };
 
+boost::filesystem::path home();
+
 #endif
