@@ -90,8 +90,7 @@ BOOST_AUTO_TEST_CASE( ssh ) {
   int expected = 0;
   if (getenv("TEST_EXPECTED")) {
     expected = atoi(getenv("TEST_EXPECTED"));
-    BOOST_TEST_MESSAGE("expected return value set to " +
-                       std::to_string(expected) + ": " +
+    BOOST_TEST_MESSAGE("expected return value set to: " +
                        known_retvals(expected));
   }
   int rc = test_pubkey(pubkey, pkey, nullptr);
@@ -102,7 +101,7 @@ BOOST_AUTO_TEST_CASE( ssh ) {
   BOOST_CHECK_EQUAL(rc, expected);
   rc = test_pubkey(ed_pubkey, ed_pkey_pp, keypass);
   BOOST_CHECK_EQUAL(rc, expected);
-  // Incorrect pubkey: show fail with LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED
+  // Incorrect pubkey: should fail with LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED
   rc = test_pubkey(ed_pubkey, pkey, nullptr);
   BOOST_CHECK_EQUAL(rc, LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED);
 }

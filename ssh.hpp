@@ -19,6 +19,8 @@ struct remote_t {
 };
 extern remote_t remote;
 
+std::string ssh2_err(LIBSSH2_SESSION* session);
+
 static inline const std::string known_retvals(int rc) {
   switch (rc) {
     case LIBSSH2_ERROR_AUTHENTICATION_FAILED:
