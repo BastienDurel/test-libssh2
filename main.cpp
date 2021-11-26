@@ -1,6 +1,6 @@
 #include <memory>
 
-#define BOOST_TEST_MODULE agent
+#define BOOST_TEST_MODULE test_libssh2
 #include <boost/test/unit_test.hpp>
 #include <boost/test/results_collector.hpp>
 #include <boost/log/core.hpp>
@@ -61,6 +61,39 @@ const char* pkey_pp =
   "LQ7psS5/Cs6hqr3Lrua87gT5P/W5WKw=\n"
   "-----END OPENSSH PRIVATE KEY-----\n";
 const char* keypass = "foobar";
+// extracted with: ssh-keygen -f fake_rsa -p -m pem
+const char* pkey_pem =
+  "-----BEGIN RSA PRIVATE KEY-----\n"
+  "MIICXQIBAAKBgQC/pbM6bmUa9ZZJArrpw8Bpv3Ue2zdR7w8q5dMSiSQNqfr7yufq\n"
+  "t23ulFB8pqPQ0+VezcfWjw6V2ZRlVQzfOTiDrc809r3qyQrHS7e4nz84VB3TRp/7\n"
+  "ZO97SB0FMu5mSDIVyHc2bsaGokm+C/gAJK1vIt6A1uQLblfZ3PXGSN534wIDAQAB\n"
+  "AoGAWxu3HOwmfK6MB6GYolFBRASU9VpZ7kWr/ETOF13DGgvZGaLYpikVxfoUWW4P\n"
+  "KtPRk0RY4JOZ53tMpO/N8sENMBgnQQ4PsI31CcWtGpSt+TGkm6zfHtANqzplb874\n"
+  "Tb1+wQpo8/gmdaKAglM8VpwOr7u1PCdbD/xopAc5tIxKP0ECQQD8XvLQNVmTBCCt\n"
+  "RFwZB4j7YC2QxjjIUgDHiJUiRBXmrbLHva2g1+jJJ3crmOvhS0tlThzLQO4wqTni\n"
+  "CqZqutlpAkEAwmc1yCI7L1dGhtyIhLN6oZ/swaB50YbfPRlEevSvlNnirlgQiRbD\n"
+  "5m1nWdu6XnzlHAPzqzZUj2q36IgZNlSxawJBALj9RFE4egNY6Db5v+Sc8F0K3/ua\n"
+  "QS8dZPLd/CtU6xTfSAg/0lDvUvR4GFN90ZGgZpDIlDSs0Kwcr5AwrFHZytkCQQCs\n"
+  "JNqyAuXn0N/J8iUNZST1U/lBqEnW6RhrMSG7w0prg9k/ywmxazBDrqMzJehNXUk/\n"
+  "2pv+A1kzuitqRIIW4z5LAkAHPro7mrQo+xnsPwhvS5e3cb32JUt57bQBtJcIyRZx\n"
+  "ytHeD/JXkzC6PGRP1LPGRCAEI/IMiAZzhZiM0d2cwura\n"
+  "-----END RSA PRIVATE KEY-----\n";
+// extracted with: openssl rsa -in fake_rsa.pem -noout -text
+const char* pubkey_pem =
+  "-----BEGIN PUBLIC KEY-----\n"
+  "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC/pbM6bmUa9ZZJArrpw8Bpv3Ue\n"
+  "2zdR7w8q5dMSiSQNqfr7yufqt23ulFB8pqPQ0+VezcfWjw6V2ZRlVQzfOTiDrc80\n"
+  "9r3qyQrHS7e4nz84VB3TRp/7ZO97SB0FMu5mSDIVyHc2bsaGokm+C/gAJK1vIt6A\n"
+  "1uQLblfZ3PXGSN534wIDAQAB\n"
+  "-----END PUBLIC KEY-----\n";
+// extracted with: ssh-keygen -f fake_rsa -e -m pem
+const char* pubkey_pem_2 =
+  "-----BEGIN RSA PUBLIC KEY-----\n"
+  "MIGJAoGBAL+lszpuZRr1lkkCuunDwGm/dR7bN1HvDyrl0xKJJA2p+vvK5+q3be6U\n"
+  "UHymo9DT5V7Nx9aPDpXZlGVVDN85OIOtzzT2verJCsdLt7ifPzhUHdNGn/tk73tI\n"
+  "HQUy7mZIMhXIdzZuxoaiSb4L+AAkrW8i3oDW5AtuV9nc9cZI3nfjAgMBAAE=\n"
+  "-----END RSA PUBLIC KEY-----\n";
+
 
 // ed25519 key
 const char* ed_pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID40+qudR9CqU+XV5hJ4pJ7WNXY297Fq0TpsMUu+YAiW bastien@data-bastien";
@@ -93,15 +126,23 @@ BOOST_AUTO_TEST_CASE( ssh ) {
     BOOST_TEST_MESSAGE("expected return value set to: " +
                        known_retvals(expected));
   }
-  int rc = test_pubkey(pubkey, pkey, nullptr);
-  BOOST_CHECK_EQUAL(rc, expected);
-  rc = test_pubkey(pubkey, pkey_pp, keypass);
-  BOOST_CHECK_EQUAL(rc, expected);
-  rc = test_pubkey(ed_pubkey, ed_pkey, nullptr);
-  BOOST_CHECK_EQUAL(rc, expected);
-  rc = test_pubkey(ed_pubkey, ed_pkey_pp, keypass);
-  BOOST_CHECK_EQUAL(rc, expected);
+  BOOST_CHECK_EQUAL(test_pubkey(pubkey, pkey, nullptr), expected);
+  BOOST_CHECK_EQUAL(test_pubkey(pubkey, pkey_pp, keypass), expected);
+  BOOST_CHECK_EQUAL(test_pubkey(pubkey, pkey_pem, nullptr), expected);
+  BOOST_CHECK_EQUAL(test_pubkey(ed_pubkey, ed_pkey, nullptr), expected);
+  BOOST_CHECK_EQUAL(test_pubkey(ed_pubkey, ed_pkey_pp, keypass), expected);
+}
+
+
+BOOST_AUTO_TEST_CASE( ssh_failures ) {
   // Incorrect pubkey: should fail with LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED
-  rc = test_pubkey(ed_pubkey, pkey, nullptr);
-  BOOST_CHECK_EQUAL(rc, LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED);
+  BOOST_CHECK_EQUAL(test_pubkey(ed_pubkey, pkey, nullptr),
+                    LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED);
+  // wrong formats
+  BOOST_CHECK_EQUAL(test_pubkey(pubkey_pem, pkey, nullptr),
+                    LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED);
+  BOOST_CHECK_EQUAL(test_pubkey(pubkey_pem, pkey_pem, nullptr),
+                    LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED);
+  BOOST_CHECK_EQUAL(test_pubkey(pubkey_pem_2, pkey_pem, nullptr),
+                    LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED);
 }
