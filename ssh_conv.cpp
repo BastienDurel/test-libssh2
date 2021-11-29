@@ -73,8 +73,14 @@ static void xd(const std::string& s) {
 }
 
 static void handle_pubkey(const std::string& pubkey);
+static void handle_privkey(const std::string& data);
+static std::string decipher(const std::string& data,
+                            const std::string& cipher,
+                            const std::string& kdfname,
+                            const std::string& kdfopts,
+                            const char* key);
 
-#define GETLEN(l) do { const uint32_t *len_ = reinterpret_cast<const uint32_t*>((unsigned char*)(d) + off); l = ntohl(*len_); off += sizeof(uint32_t); } while (0)
+#define GETLEN(l) do { if ((off + sizeof(uint32_t)) > data.size()) THROW("Cannot extract data from openssh keydata: cannot read length out of buffer"); const uint32_t *len_ = reinterpret_cast<const uint32_t*>((unsigned char*)(d) + off); l = ntohl(*len_); off += sizeof(uint32_t); } while (0)
 #define CHECK_OFF(x)  BOOST_LOG_TRIVIAL(debug) << x " len: " << len; if ((off + len) > data.size()) THROW("Cannot extract data from openssh keydata: invalid length")
 
 std::string openssh2pem(const std::string& keydata) {
@@ -82,7 +88,7 @@ std::string openssh2pem(const std::string& keydata) {
   std::istringstream i{ keydata };
   char buf[76];
   bool in_header = false;
-  std::string data;
+  std::string data, datab;
   while (!i.eof()) {
     i.getline(buf, 72);
     if (i.fail())
@@ -103,9 +109,10 @@ std::string openssh2pem(const std::string& keydata) {
       in_header = hdr.back() == '\\';
       continue;
     }
-    data.append(decode(buf));
+    datab.append(buf);
     BOOST_LOG_TRIVIAL(trace) << "buf: " << buf;
   }
+  data = decode(datab);
   xd(data);
   BOOST_LOG_TRIVIAL(debug) << "decoded: " << sview(data, 14)
                            << " (" << data.size() << ")";
@@ -137,12 +144,14 @@ std::string openssh2pem(const std::string& keydata) {
   std::string pubkey{ data.data() + off, len };
   off += len;
   handle_pubkey(pubkey);
-  BOOST_LOG_TRIVIAL(debug) << "pubkey: " << pubkey.size() << " bytes";
   GETLEN(len);
   CHECK_OFF("privkey");
   std::string privkey{ data.data() + off, len };
   off += len;
   BOOST_LOG_TRIVIAL(debug) << "privkey: " << privkey.size() << " bytes";
+  if (cipher != "none")
+    privkey = decipher(privkey, cipher, kdfname, kdfoptions, "");
+  handle_privkey(privkey);
   return keydata;
 }
 
@@ -151,8 +160,93 @@ static void handle_pubkey(const std::string& data) {
   ssize_t off = 0;
   uint32_t len;
   GETLEN(len);
-  CHECK_OFF("keytype");
+  CHECK_OFF(" - keytype");
   std::string keytype{ data.data() + off, len };
   off += len;
   BOOST_LOG_TRIVIAL(debug) << " - keytype: " << keytype;
+  if (keytype == "ssh-rsa") {
+    GETLEN(len);
+    CHECK_OFF(" - pub0");
+    std::string pub0{ data.data() + off, len };
+    off += len;
+    BOOST_LOG_TRIVIAL(debug) << " - pub0: " << pub0.size();
+    xd(pub0);
+    GETLEN(len);
+    CHECK_OFF(" - pub1");
+    std::string pub1{ data.data() + off, len };
+    off += len;
+    BOOST_LOG_TRIVIAL(debug) << " - pub1: " << pub1.size();
+    xd(pub1);
+  }
+}
+
+static std::string decipher(const std::string& data, const std::string& cipher,
+                            const std::string& kdfname,
+                            const std::string& kdfopts, const char* key) {
+  // TODO
+  THROW("Unhandled key encryption");
+  return data;
+}
+
+static void handle_privkey(const std::string& data) {
+  const void* d = data.data();
+  ssize_t off = 0;
+  uint32_t len, c1, c2;
+  GETLEN(c1);
+  GETLEN(c2);
+  if (c1 != c2)
+    THROW("Cannot extract data from openssh keydata: privkey checksum failed");
+  GETLEN(len);
+  CHECK_OFF(" - keytype");
+  std::string keytype{ data.data() + off, len };
+  off += len;
+  BOOST_LOG_TRIVIAL(debug) << " - keytype: " << keytype;
+  if (keytype == "ssh-rsa") {
+    GETLEN(len);
+    CHECK_OFF(" - rsa_n");
+    std::string rsa_n{ data.data() + off, len };
+    off += len;
+    BOOST_LOG_TRIVIAL(debug) << " - rsa_n: " << rsa_n.size();
+    xd(rsa_n);
+    GETLEN(len);
+    CHECK_OFF(" - rsa_e");
+    std::string rsa_e{ data.data() + off, len };
+    off += len;
+    BOOST_LOG_TRIVIAL(debug) << " - rsa_e: " << rsa_e.size();
+    xd(rsa_e);
+    GETLEN(len);
+    CHECK_OFF(" - rsa_d");
+    std::string rsa_d{ data.data() + off, len };
+    off += len;
+    BOOST_LOG_TRIVIAL(debug) << " - rsa_d: " << rsa_d.size();
+    xd(rsa_d);
+    GETLEN(len);
+    CHECK_OFF(" - rsa_iqmp");
+    std::string rsa_iqmp{ data.data() + off, len };
+    off += len;
+    BOOST_LOG_TRIVIAL(debug) << " - rsa_iqmp: " << rsa_iqmp.size();
+    xd(rsa_iqmp);
+    GETLEN(len);
+    CHECK_OFF(" - rsa_p");
+    std::string rsa_p{ data.data() + off, len };
+    off += len;
+    BOOST_LOG_TRIVIAL(debug) << " - rsa_p: " << rsa_p.size();
+    xd(rsa_p);
+    GETLEN(len);
+    CHECK_OFF(" - rsa_q");
+    std::string rsa_q{ data.data() + off, len };
+    off += len;
+    BOOST_LOG_TRIVIAL(debug) << " - rsa_q: " << rsa_q.size();
+    xd(rsa_q);
+    GETLEN(len);
+    CHECK_OFF(" - comment");
+    std::string comment{ data.data() + off, len };
+    off += len;
+    BOOST_LOG_TRIVIAL(debug) << " - comment: " << comment;
+    std::string padding{ data.data() + off, data.size() - off };
+    BOOST_LOG_TRIVIAL(debug) << padding.size() << " bytes of padding...";
+    xd(padding);
+    return;
+  }
+  THROW("Unhandled key type");
 }
