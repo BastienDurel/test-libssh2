@@ -244,7 +244,7 @@ static void handle_privkey(const std::string& data) {
     off += len;
     BOOST_LOG_TRIVIAL(debug) << " - comment: " << comment;
     std::string padding{ data.data() + off, data.size() - off };
-    BOOST_LOG_TRIVIAL(debug) << padding.size() << " bytes of padding...";
+    BOOST_LOG_TRIVIAL(debug) << " - " << padding.size() << " bytes of padding";
     xd(padding);
     return;
   }
