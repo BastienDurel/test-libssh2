@@ -12,7 +12,7 @@ CHECK_INCLUDE_FILE(unistd.h HAVE_UNISTD)
 include(CheckSymbolExists)
 check_symbol_exists(mkstemp stdlib.h HAVE_MKSTEMP)
 
-add_executable(Tests main.cpp ssh.cpp ssh_more.cpp utils.cpp test.hpp)
+add_executable(Tests main.cpp ssh.cpp ssh_conv.cpp ssh_more.cpp utils.cpp test.hpp)
 target_include_directories(Tests PUBLIC src "${Boost_INCLUDE_DIRS}")
 target_include_directories(Tests PRIVATE src "${PROJECT_BINARY_DIR}")
 target_link_libraries(Tests PUBLIC

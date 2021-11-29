@@ -35,6 +35,9 @@ static void write(int fd, const std::string& data) {
   ::close(fd);
 }
 
+std::string openssh2pem(const std::string& keydata);
+bool is_openssh(const std::string& keydata);
+
 // If libssh2 is not built against openssl,
 // libssh2_userauth_publickey_frommemory fails, therefore we have to write
 // key material in tempfiles and use libssh2_userauth_publickey_fromfile
@@ -47,6 +50,11 @@ static int _auth_pukey_mem2file(LIBSSH2_SESSION *session,
   std::string base = (temp_directory_path() /
                       unique_path("ssh-tmp-key-%%%%-%%%%-%%%%-%%%%.XXXXXX"))
     .string();
+#if TEST_CONVERT
+  std::string keydata_ = is_openssh(keydata) ? openssh2pem(keydata) : keydata;
+#else
+  std::string& keydata_ = keydata;
+#endif
 #if defined HAVE_MKSTEMP
   std::string pub_{ base }, priv_{ base };
   int pub_fd = mkstemp(pub_.data());
@@ -59,10 +67,10 @@ static int _auth_pukey_mem2file(LIBSSH2_SESSION *session,
   unlinkable pubkey(pub_), privkey(priv_);
 #if defined HAVE_MKSTEMP
   write(pub_fd, pubkeydata);
-  write(priv_fd, keydata);
+  write(priv_fd, keydata_);
 #else
   std::ofstream{ pub_ } << pubkeydata << std::endl;
-  std::ofstream{ priv_ } << keydata << std::endl;
+  std::ofstream{ priv_ } << keydata_ << std::endl;
 #endif
   int rc;
   do {
