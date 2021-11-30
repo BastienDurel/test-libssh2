@@ -73,8 +73,15 @@ static void xd(const std::string& s) {
     while (i++ < BLOCK)
       hex.append("   ");
     sprintf(offset, "[%.4x] ", off);
-    BOOST_LOG_TRIVIAL(debug) << offset << hex << "\t" << asc;
+    BOOST_LOG_TRIVIAL(trace) << offset << hex << "\t" << asc;
   } while (off < s.size());
+}
+template <int BLOCK = 16>
+static void xd(const BIGNUM* b) {
+  int len = BN_num_bytes(b);
+  std::string buf(len, 0);
+  BN_bn2bin(b, reinterpret_cast<unsigned char*>(buf.data()));
+  xd(buf);
 }
 
 static void handle_pubkey(const std::string& pubkey);
@@ -86,7 +93,7 @@ static std::string decipher(const std::string& data,
                             const char* key);
 
 #define GETLEN(l) do { if ((off + sizeof(uint32_t)) > data.size()) THROW("Cannot extract data from openssh keydata: cannot read length out of buffer"); const uint32_t *len_ = reinterpret_cast<const uint32_t*>((unsigned char*)(d) + off); l = ntohl(*len_); off += sizeof(uint32_t); } while (0)
-#define CHECK_OFF(x)  BOOST_LOG_TRIVIAL(debug) << x " len: " << len; if ((off + len) > data.size()) THROW("Cannot extract data from openssh keydata: invalid length")
+#define CHECK_OFF(x)  BOOST_LOG_TRIVIAL(trace) << x " len: " << len; if ((off + len) > data.size()) THROW("Cannot extract data from openssh keydata: invalid length")
 
 std::string openssh2pem(const std::string& keydata) {
   BOOST_LOG_TRIVIAL(debug) << "Trying to convert " << sview(keydata);
@@ -104,13 +111,13 @@ std::string openssh2pem(const std::string& keydata) {
       break;
     if (in_header) {
       std::string hdr{ buf };
-      BOOST_LOG_TRIVIAL(debug) << " -cont: " << hdr;
+      BOOST_LOG_TRIVIAL(trace) << " -cont: " << hdr;
       in_header = hdr.back() == '\\';
       continue;
     }
     if (strchr(buf, ':')) {
       std::string hdr{ buf };
-      BOOST_LOG_TRIVIAL(debug) << "header: " << hdr;
+      BOOST_LOG_TRIVIAL(trace) << "header: " << hdr;
       in_header = hdr.back() == '\\';
       continue;
     }
@@ -119,7 +126,7 @@ std::string openssh2pem(const std::string& keydata) {
   }
   data = decode(datab);
   xd(data);
-  BOOST_LOG_TRIVIAL(debug) << "decoded: " << sview(data, 14)
+  BOOST_LOG_TRIVIAL(trace) << "decoded: " << sview(data, 14)
                            << " (" << data.size() << ")";
   if (data.compare(0, 14, "openssh-key-v1"))
     THROW("Cannot extract data from openssh keydata: unknown format");
@@ -130,17 +137,17 @@ std::string openssh2pem(const std::string& keydata) {
   CHECK_OFF("cipher");
   std::string cipher{ data.data() + off, len };
   off += len;
-  BOOST_LOG_TRIVIAL(debug) << "cipher: " << cipher;
+  BOOST_LOG_TRIVIAL(trace) << "cipher: " << cipher;
   GETLEN(len);
   CHECK_OFF("kdfname");
   std::string kdfname{ data.data() + off, len };
   off += len;
-  BOOST_LOG_TRIVIAL(debug) << "kdfname: " << kdfname;
+  BOOST_LOG_TRIVIAL(trace) << "kdfname: " << kdfname;
   GETLEN(len);
   CHECK_OFF("kdfoptions");
   std::string kdfoptions{ data.data() + off, len };
   off += len;
-  BOOST_LOG_TRIVIAL(debug) << "kdfoptions: " << kdfoptions;
+  BOOST_LOG_TRIVIAL(trace) << "kdfoptions: " << kdfoptions;
   GETLEN(keynum);
   if (keynum != 1)
     THROW("Cannot extract data from openssh keydata: key# != 1: " + std::to_string(keynum));
@@ -153,7 +160,7 @@ std::string openssh2pem(const std::string& keydata) {
   CHECK_OFF("privkey");
   std::string privkey{ data.data() + off, len };
   off += len;
-  BOOST_LOG_TRIVIAL(debug) << "privkey: " << privkey.size() << " bytes";
+  BOOST_LOG_TRIVIAL(trace) << "privkey: " << privkey.size() << " bytes";
   if (cipher != "none")
     privkey = decipher(privkey, cipher, kdfname, kdfoptions, "");
   return handle_privkey(privkey);
@@ -167,19 +174,19 @@ static void handle_pubkey(const std::string& data) {
   CHECK_OFF(" - keytype");
   std::string keytype{ data.data() + off, len };
   off += len;
-  BOOST_LOG_TRIVIAL(debug) << " - keytype: " << keytype;
+  BOOST_LOG_TRIVIAL(trace) << " - keytype: " << keytype;
   if (keytype == "ssh-rsa") {
     GETLEN(len);
     CHECK_OFF(" - pub0");
     std::string pub0{ data.data() + off, len };
     off += len;
-    BOOST_LOG_TRIVIAL(debug) << " - pub0: " << pub0.size();
+    BOOST_LOG_TRIVIAL(trace) << " - pub0: " << pub0.size();
     xd(pub0);
     GETLEN(len);
     CHECK_OFF(" - pub1");
     std::string pub1{ data.data() + off, len };
     off += len;
-    BOOST_LOG_TRIVIAL(debug) << " - pub1: " << pub1.size();
+    BOOST_LOG_TRIVIAL(trace) << " - pub1: " << pub1.size();
     xd(pub1);
   }
 }
@@ -227,7 +234,7 @@ static std::string dump(RSA* key) {
   {
     std::string r{ buffer, len };
     res.append(r);
-    BOOST_LOG_TRIVIAL(debug) << r;
+    BOOST_LOG_TRIVIAL(trace) << r;
   }
   BIO_free(keybio);
   return res;
@@ -245,7 +252,7 @@ static void print(RSA* key) {
     res.append(buffer, len);
   }
   BIO_free(keybio);
-  BOOST_LOG_TRIVIAL(debug) << res;
+  BOOST_LOG_TRIVIAL(trace) << res;
 }
 
 static std::string handle_privkey(const std::string& data) {
@@ -260,7 +267,7 @@ static std::string handle_privkey(const std::string& data) {
   CHECK_OFF(" - keytype");
   std::string keytype{ data.data() + off, len };
   off += len;
-  BOOST_LOG_TRIVIAL(debug) << " - keytype: " << keytype;
+  BOOST_LOG_TRIVIAL(trace) << " - keytype: " << keytype;
   if (keytype == "ssh-rsa") {
     BIGNUM *rsa_n_ = nullptr, *rsa_e_ = nullptr, *rsa_d_ = nullptr,
       *rsa_iqmp_ = nullptr, *rsa_p_ = nullptr, *rsa_q_ = nullptr;
@@ -276,69 +283,92 @@ static std::string handle_privkey(const std::string& data) {
     CHECK_OFF(" - rsa_n");
     std::string rsa_n{ data.data() + off, len };
     off += len;
-    BOOST_LOG_TRIVIAL(debug) << " - rsa_n: " << rsa_n.size();
+    BOOST_LOG_TRIVIAL(trace) << " - rsa_n: " << rsa_n.size();
     xd(rsa_n);
     b2bignum(rsa_n, &rsa_n_);
-    BOOST_LOG_TRIVIAL(debug) << " - key is " << BN_num_bits(rsa_n_) << " bits";
+    BOOST_LOG_TRIVIAL(trace) << " - key is " << BN_num_bits(rsa_n_) << " bits";
     GETLEN(len);
     CHECK_OFF(" - rsa_e");
     std::string rsa_e{ data.data() + off, len };
     off += len;
-    BOOST_LOG_TRIVIAL(debug) << " - rsa_e: " << rsa_e.size();
+    BOOST_LOG_TRIVIAL(trace) << " - rsa_e: " << rsa_e.size();
     xd(rsa_e);
     b2bignum(rsa_e, &rsa_e_);
     GETLEN(len);
     CHECK_OFF(" - rsa_d");
     std::string rsa_d{ data.data() + off, len };
     off += len;
-    BOOST_LOG_TRIVIAL(debug) << " - rsa_d: " << rsa_d.size();
+    BOOST_LOG_TRIVIAL(trace) << " - rsa_d: " << rsa_d.size();
     xd(rsa_d);
     b2bignum(rsa_d, &rsa_d_);
     GETLEN(len);
     CHECK_OFF(" - rsa_iqmp");
     std::string rsa_iqmp{ data.data() + off, len };
     off += len;
-    BOOST_LOG_TRIVIAL(debug) << " - rsa_iqmp: " << rsa_iqmp.size();
+    BOOST_LOG_TRIVIAL(trace) << " - rsa_iqmp: " << rsa_iqmp.size();
     xd(rsa_iqmp);
     b2bignum(rsa_iqmp, &rsa_iqmp_);
     GETLEN(len);
     CHECK_OFF(" - rsa_p");
     std::string rsa_p{ data.data() + off, len };
     off += len;
-    BOOST_LOG_TRIVIAL(debug) << " - rsa_p: " << rsa_p.size();
+    BOOST_LOG_TRIVIAL(trace) << " - rsa_p: " << rsa_p.size();
     xd(rsa_p);
     b2bignum(rsa_p, &rsa_p_);
     GETLEN(len);
     CHECK_OFF(" - rsa_q");
     std::string rsa_q{ data.data() + off, len };
     off += len;
-    BOOST_LOG_TRIVIAL(debug) << " - rsa_q: " << rsa_q.size();
+    BOOST_LOG_TRIVIAL(trace) << " - rsa_q: " << rsa_q.size();
     xd(rsa_q);
     b2bignum(rsa_q, &rsa_q_);
     GETLEN(len);
     CHECK_OFF(" - comment");
     std::string comment{ data.data() + off, len };
     off += len;
-    BOOST_LOG_TRIVIAL(debug) << " - comment: " << comment;
+    BOOST_LOG_TRIVIAL(trace) << " - comment: " << comment;
     std::string padding{ data.data() + off, data.size() - off };
-    BOOST_LOG_TRIVIAL(debug) << " - " << padding.size() << " bytes of padding";
+    BOOST_LOG_TRIVIAL(trace) << " - " << padding.size() << " bytes of padding";
     xd(padding);
+    // Compute dmp1 & dmq1
+    BN_CTX *ctx = nullptr;
+    BIGNUM *dmp1 = nullptr, *dmq1 = nullptr, *aux = nullptr;
+    autofn bn2_{[&dmp1, &dmq1, &aux, &ctx] {
+      if (aux) BN_clear_free(aux);
+      if (dmp1) BN_clear_free(dmp1);
+      if (dmq1) BN_clear_free(dmq1);
+      BN_CTX_free(ctx);
+    }};
+    ctx = BN_CTX_new();
+    aux = BN_new();
+    dmp1 = BN_new();
+    dmq1 = BN_new();
+    if (!BN_sub(aux, rsa_q_, BN_value_one()))
+      THROW("Error in math" + sslerr());
+    if (!BN_mod(dmq1, rsa_d_, aux, ctx))
+      THROW("Error in math" + sslerr());
+    xd<15>(dmq1);
+    if (!BN_sub(aux, rsa_p_, BN_value_one()))
+      THROW("Error in math" + sslerr());
+    if (!BN_mod(dmp1, rsa_d_, aux, ctx))
+      THROW("Error in math" + sslerr());
+    xd<15>(dmp1);
+    // Create key
     RSA* key = RSA_new();
-    autofn key_{ [key]() { RSA_free(key); }};
+    autofn key_{ [&key]() { RSA_free(key); }};
     if (!RSA_set0_key(key, rsa_n_, rsa_e_, rsa_d_))
       THROW("RSA_set0_key error" + sslerr());
     rsa_n_ = rsa_e_ = rsa_d_ = nullptr;
-    if (!RSA_set0_crt_params(key, nullptr, nullptr, rsa_iqmp_))
-      ;// ignore //THROW("RSA_set0_crt_params error" + sslerr());
-    else
-      rsa_iqmp_ = nullptr;
+    if (!RSA_set0_crt_params(key, dmp1, dmq1, rsa_iqmp_))
+      THROW("RSA_set0_crt_params error" + sslerr());
+    rsa_iqmp_ = dmp1 = dmq1 = nullptr;
     if (!RSA_set0_factors(key, rsa_p_, rsa_q_))
       THROW("RSA_set0_factors error" + sslerr());
     rsa_p_ = rsa_q_ = nullptr;
+    print(key);
     if (!RSA_check_key(key))
       THROW("Invalid key" + sslerr());
-    BOOST_LOG_TRIVIAL(debug) << "RSA key loaded";
-    print(key);
+    BOOST_LOG_TRIVIAL(trace) << "RSA key loaded";
     return dump(key);
   }
   THROW("Unhandled key type");
