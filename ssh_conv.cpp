@@ -6,6 +6,11 @@
 #include <boost/archive/iterators/insert_linebreaks.hpp>
 #include <boost/archive/iterators/remove_whitespace.hpp>
 
+#include <openssl/bn.h>
+#include <openssl/rsa.h>
+#include <openssl/err.h>
+#include <openssl/pem.h>
+
 #include "ssh.hpp"
 #include "test.hpp"
 #include "utils.hpp"
@@ -73,7 +78,7 @@ static void xd(const std::string& s) {
 }
 
 static void handle_pubkey(const std::string& pubkey);
-static void handle_privkey(const std::string& data);
+static std::string handle_privkey(const std::string& data);
 static std::string decipher(const std::string& data,
                             const std::string& cipher,
                             const std::string& kdfname,
@@ -151,8 +156,7 @@ std::string openssh2pem(const std::string& keydata) {
   BOOST_LOG_TRIVIAL(debug) << "privkey: " << privkey.size() << " bytes";
   if (cipher != "none")
     privkey = decipher(privkey, cipher, kdfname, kdfoptions, "");
-  handle_privkey(privkey);
-  return keydata;
+  return handle_privkey(privkey);
 }
 
 static void handle_pubkey(const std::string& data) {
@@ -188,7 +192,63 @@ static std::string decipher(const std::string& data, const std::string& cipher,
   return data;
 }
 
-static void handle_privkey(const std::string& data) {
+static std::string sslerr() {
+  unsigned long e = ERR_get_error();
+  std::string r;
+  while (e) {
+    if (r.empty())
+      r.append(": ");
+    char buf[384];
+    ERR_error_string_n(e, buf, sizeof(buf));
+    r.append(buf);
+    e = ERR_get_error();
+    if (e) r.append("; ");
+  }
+  return r;
+}
+
+static void b2bignum(const std::string& buf, BIGNUM** b) {
+  BIGNUM* v = BN_new();
+  if (!v) THROW("Cannot alloc bignum");
+  *b = BN_bin2bn(reinterpret_cast<const unsigned char*>(buf.data()),
+                 buf.size(), v);
+  if (!*b) THROW("Cannot read bignum");
+}
+
+static std::string dump(RSA* key) {
+  BIO * keybio = BIO_new(BIO_s_mem());
+  if (!keybio) THROW("Cannot alloc BIO" + sslerr());
+  PEM_write_bio_RSAPrivateKey(keybio, key,
+                              nullptr, nullptr, 0, nullptr, nullptr);
+  char buffer [1024];
+  std::string res = "";
+  size_t len;
+  while (BIO_read_ex(keybio, buffer, sizeof(buffer), &len))
+  {
+    std::string r{ buffer, len };
+    res.append(r);
+    BOOST_LOG_TRIVIAL(debug) << r;
+  }
+  BIO_free(keybio);
+  return res;
+}
+
+static void print(RSA* key) {
+  BIO * keybio = BIO_new(BIO_s_mem());
+  if (!keybio) THROW("Cannot alloc BIO" + sslerr());
+  RSA_print(keybio, key, 0);
+  char buffer [1024];
+  size_t len;
+  std::string res = "";
+  while (BIO_read_ex(keybio, buffer, sizeof(buffer), &len))
+  {
+    res.append(buffer, len);
+  }
+  BIO_free(keybio);
+  BOOST_LOG_TRIVIAL(debug) << res;
+}
+
+static std::string handle_privkey(const std::string& data) {
   const void* d = data.data();
   ssize_t off = 0;
   uint32_t len, c1, c2;
@@ -202,42 +262,59 @@ static void handle_privkey(const std::string& data) {
   off += len;
   BOOST_LOG_TRIVIAL(debug) << " - keytype: " << keytype;
   if (keytype == "ssh-rsa") {
+    BIGNUM *rsa_n_ = nullptr, *rsa_e_ = nullptr, *rsa_d_ = nullptr,
+      *rsa_iqmp_ = nullptr, *rsa_p_ = nullptr, *rsa_q_ = nullptr;
+    autofn bns_{[&rsa_n_, &rsa_e_, &rsa_d_, &rsa_iqmp_, &rsa_p_, &rsa_q_] {
+      BN_clear_free(rsa_n_);
+      BN_clear_free(rsa_e_);
+      BN_clear_free(rsa_d_);
+      BN_clear_free(rsa_iqmp_);
+      BN_clear_free(rsa_p_);
+      BN_clear_free(rsa_q_);
+    }};
     GETLEN(len);
     CHECK_OFF(" - rsa_n");
     std::string rsa_n{ data.data() + off, len };
     off += len;
     BOOST_LOG_TRIVIAL(debug) << " - rsa_n: " << rsa_n.size();
     xd(rsa_n);
+    b2bignum(rsa_n, &rsa_n_);
+    BOOST_LOG_TRIVIAL(debug) << " - key is " << BN_num_bits(rsa_n_) << " bits";
     GETLEN(len);
     CHECK_OFF(" - rsa_e");
     std::string rsa_e{ data.data() + off, len };
     off += len;
     BOOST_LOG_TRIVIAL(debug) << " - rsa_e: " << rsa_e.size();
     xd(rsa_e);
+    b2bignum(rsa_e, &rsa_e_);
     GETLEN(len);
     CHECK_OFF(" - rsa_d");
     std::string rsa_d{ data.data() + off, len };
     off += len;
     BOOST_LOG_TRIVIAL(debug) << " - rsa_d: " << rsa_d.size();
     xd(rsa_d);
+    b2bignum(rsa_d, &rsa_d_);
     GETLEN(len);
     CHECK_OFF(" - rsa_iqmp");
     std::string rsa_iqmp{ data.data() + off, len };
     off += len;
     BOOST_LOG_TRIVIAL(debug) << " - rsa_iqmp: " << rsa_iqmp.size();
     xd(rsa_iqmp);
+    b2bignum(rsa_iqmp, &rsa_iqmp_);
     GETLEN(len);
     CHECK_OFF(" - rsa_p");
     std::string rsa_p{ data.data() + off, len };
     off += len;
     BOOST_LOG_TRIVIAL(debug) << " - rsa_p: " << rsa_p.size();
     xd(rsa_p);
+    b2bignum(rsa_p, &rsa_p_);
     GETLEN(len);
     CHECK_OFF(" - rsa_q");
     std::string rsa_q{ data.data() + off, len };
     off += len;
     BOOST_LOG_TRIVIAL(debug) << " - rsa_q: " << rsa_q.size();
     xd(rsa_q);
+    b2bignum(rsa_q, &rsa_q_);
     GETLEN(len);
     CHECK_OFF(" - comment");
     std::string comment{ data.data() + off, len };
@@ -246,7 +323,23 @@ static void handle_privkey(const std::string& data) {
     std::string padding{ data.data() + off, data.size() - off };
     BOOST_LOG_TRIVIAL(debug) << " - " << padding.size() << " bytes of padding";
     xd(padding);
-    return;
+    RSA* key = RSA_new();
+    autofn key_{ [key]() { RSA_free(key); }};
+    if (!RSA_set0_key(key, rsa_n_, rsa_e_, rsa_d_))
+      THROW("RSA_set0_key error" + sslerr());
+    rsa_n_ = rsa_e_ = rsa_d_ = nullptr;
+    if (!RSA_set0_crt_params(key, nullptr, nullptr, rsa_iqmp_))
+      ;// ignore //THROW("RSA_set0_crt_params error" + sslerr());
+    else
+      rsa_iqmp_ = nullptr;
+    if (!RSA_set0_factors(key, rsa_p_, rsa_q_))
+      THROW("RSA_set0_factors error" + sslerr());
+    rsa_p_ = rsa_q_ = nullptr;
+    if (!RSA_check_key(key))
+      THROW("Invalid key" + sslerr());
+    BOOST_LOG_TRIVIAL(debug) << "RSA key loaded";
+    print(key);
+    return dump(key);
   }
   THROW("Unhandled key type");
 }

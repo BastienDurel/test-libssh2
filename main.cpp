@@ -7,6 +7,10 @@
 #include <boost/log/trivial.hpp>
 #include <boost/log/expressions.hpp>
 
+#include <openssl/opensslv.h>
+#include <openssl/crypto.h>
+#include <openssl/err.h>
+
 #include "ssh.hpp"
 
 // Initialize application (set logger level, setup exec destructor handler)
@@ -20,6 +24,12 @@ struct auto_init {
       (
         logging::trivial::severity >= lvl
         );
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+    SSL_library_init();
+#else
+    OPENSSL_init_crypto(0, NULL);
+#endif
+    ERR_load_crypto_strings();
   }
 };
 static std::unique_ptr<auto_init> _auto_init_instance(new auto_init);

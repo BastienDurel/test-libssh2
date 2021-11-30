@@ -53,7 +53,7 @@ static int _auth_pukey_mem2file(LIBSSH2_SESSION *session,
 #if TEST_CONVERT
   std::string keydata_ = is_openssh(keydata) ? openssh2pem(keydata) : keydata;
 #else
-  std::string& keydata_ = keydata;
+  const std::string& keydata_ = keydata;
 #endif
 #if defined HAVE_MKSTEMP
   std::string pub_{ base }, priv_{ base };
