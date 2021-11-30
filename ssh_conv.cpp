@@ -147,7 +147,8 @@ std::string openssh2pem(const std::string& keydata) {
   CHECK_OFF("kdfoptions");
   std::string kdfoptions{ data.data() + off, len };
   off += len;
-  BOOST_LOG_TRIVIAL(trace) << "kdfoptions: " << kdfoptions;
+  BOOST_LOG_TRIVIAL(trace) << "kdfoptions(" << kdfoptions.size() << "): "
+                           << kdfoptions;
   GETLEN(keynum);
   if (keynum != 1)
     THROW("Cannot extract data from openssh keydata: key# != 1: " + std::to_string(keynum));
@@ -191,10 +192,38 @@ static void handle_pubkey(const std::string& data) {
   }
 }
 
+static std::pair<std::string, uint32_t> opts(const std::string& data) {
+    const void* d = data.data();
+    ssize_t off = 0;
+    uint32_t len, rounds;
+    GETLEN(len);
+    CHECK_OFF(" - salt");
+    std::string salt{ data.data() + off, len };
+    off += len;
+    BOOST_LOG_TRIVIAL(trace) << " - salt size: " << salt.size();
+    GETLEN(rounds);
+    BOOST_LOG_TRIVIAL(trace) << " - rounds: " << rounds;
+    return std::make_pair(salt, rounds);
+}
+
+static std::pair<std::string, std::string> bcrypt_pbkdf(
+  const char *pass, const std::string& salt, unsigned int rounds) {
+  // TODO
+  THROW("unimplemented bcrypt_pbkdf()");
+}
+
 static std::string decipher(const std::string& data, const std::string& cipher,
                             const std::string& kdfname,
                             const std::string& kdfopts, const char* key) {
   // TODO
+  BOOST_LOG_TRIVIAL(debug) << " - cipher: " << cipher;
+  if (kdfname == "bcrypt") {
+    auto o_ = opts(kdfopts);
+    const void* d = data.data();
+    ssize_t off = 0;
+    uint32_t len;
+    auto p_ = bcrypt_pbkdf(key, o_.first, o_.second);
+  }
   THROW("Unhandled key encryption");
   return data;
 }
